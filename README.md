@@ -22,16 +22,17 @@ x2ᵀ · F · x1 = 0
 calibration interne. Elle permet de tracer, pour chaque point d'une image, sa **ligne
 épipolaire** dans l'autre — la droite sur laquelle doit se trouver son point correspondant.
 
-## II. Algorithme à 8 points (calibration)
+## II. Algorithme à 8 points (estimation de la géométrie épipolaire)
 
 1. Détection et appariement de points d'intérêt entre les deux images (SIFT + FLANN).
 2. Estimation de `F` à partir de 8 correspondances par l'**algorithme à 8 points**
    (Longuet-Higgins, 1981) : résolution du système linéaire `x2ᵀ F x1 = 0` par SVD, puis
    projection sur l'espace des matrices de rang 2.
-3. Robustification par un **RANSAC** artisanal (2000 tirages de 8 points au hasard, conservation
-   du tirage produisant le plus d'inliers, seuil d'erreur `|x2ᵀ F x1| < 0.001`).
+3. Robustification par un **RANSAC** (2000 tirages de 8 points au hasard, conservation du tirage
+   produisant le plus d'inliers, seuil d'erreur `|x2ᵀ F x1| < 0.001`).
 
-Comparé systématiquement à `cv2.findFundamentalMat`.
+Comparé systématiquement à `cv2.findFundamentalMat` : sur la paire fournie, les deux estimations
+retiennent exactement les mêmes inliers (3459 sur 3890 appariements, à 3 px d'erreur de Sampson).
 
 ## III. Carte de disparité
 
@@ -44,14 +45,16 @@ Comparé systématiquement à `cv2.findFundamentalMat`.
 Avant de calculer une carte de disparité par recherche de correspondances ligne par ligne, les
 deux images sont **rectifiées** (homographies via `cv2.stereoRectifyUncalibrated`) pour que leurs
 lignes épipolaires deviennent horizontales. La disparité est ensuite estimée par **block
-matching** maison (somme des différences absolues sur une fenêtre glissante autour de chaque
-pixel), avec une version parallélisée sur plusieurs threads, comparée à `cv2.StereoBM`.
+matching** (somme des différences absolues sur une fenêtre glissante autour de chaque pixel),
+comparé à `cv2.StereoBM`. Une version répartissant les lignes sur plusieurs threads existe
+(`disparity_map_multithreading`), mais `main.py` utilise la version mono-thread.
 
 ## IV. Résultats et comparaisons
 
-Images issues du support de présentation du TIPE, sur la paire `data/left.jpg` / `data/right.jpg`.
+Figures reprises du support de présentation du TIPE, obtenues avec le code de ce dépôt sur la paire
+`data/left.jpg` / `data/right.jpg`.
 
-**Réalisé avec ce dépôt** (implémentation maison — algorithme à 8 points, RANSAC, block matching) :
+**Implémentation de ce dépôt** (algorithme à 8 points, RANSAC, block matching) :
 
 Lignes épipolaires avant rectification (elles convergent vers l'épipole, en bas à gauche) puis
 après rectification (elles deviennent horizontales, ce qui valide la rectification) :
@@ -65,12 +68,12 @@ Image rectifiée :
 
 Carte de disparité (meilleure version obtenue) :
 
-![Carte de disparité (maison)](results/disparity_map.png)
+![Carte de disparité](results/disparity_map.png)
 
 **Obtenu avec OpenCV** (référence de comparaison, `cv2.StereoBM`) :
 
 Sur la même paire rectifiée, une carte de disparité nettement plus propre — meilleure gestion des
-occlusions et du bruit que l'implémentation maison ci-dessus :
+occlusions et du bruit que l'implémentation ci-dessus :
 
 ![Carte de disparité (OpenCV)](results/disparity_map_opencv.png)
 
@@ -80,6 +83,9 @@ occlusions et du bruit que l'implémentation maison ci-dessus :
 pip install -r requirements.txt
 ```
 
+`requirements.txt` n'épingle aucune version ; le code a été vérifié avec Python 3.10, OpenCV 4.9
+et NumPy 1.23 sous Linux.
+
 ## Usage
 
 ```
@@ -87,7 +93,9 @@ python3 main.py
 ```
 
 Lit `data/left.jpg` et `data/right.jpg`, écrit les résultats dans `outputs/` (non versionné,
-régénéré à chaque exécution).
+régénéré à chaque exécution). Compter une quinzaine de minutes : le block matching est écrit en
+Python pur (~13 min sur la paire fournie, 606 × 700, fenêtre 5 × 5) et le RANSAC ~35 s. La
+progression du calcul de disparité s'affiche ligne par ligne dans le terminal.
 
 Calibrage manuel optionnel (sélection à la souris de points correspondants, en alternative à la
 détection automatique SIFT) :
@@ -99,13 +107,15 @@ python3 -m src.manual_calibration
 ## Structure du dépôt
 
 ```
-main.py                    pipeline complet, du chargement des images à la carte de disparité
+main.py                   pipeline complet, du chargement des images à la carte de disparité
+requirements.txt          dépendances : numpy, opencv-python, matplotlib
 src/
-  fundamental_matrix.py     algorithme à 8 points + RANSAC maison
-  rectification.py          détection SIFT/FLANN, rectification, tracé des lignes épipolaires
-  disparity.py               carte de disparité par block matching (mono-thread et multi-thread)
-  depth.py                    conversion disparité -> profondeur
-  manual_calibration.py       outil interactif de calibrage manuel (optionnel)
-data/                       paire d'images stéréo d'entrée
-results/                    exemples de résultats (figés, pour ce README)
+  fundamental_matrix.py   algorithme à 8 points + RANSAC
+  rectification.py        détection SIFT/FLANN, rectification, tracé des lignes épipolaires
+  disparity.py            carte de disparité par block matching (mono-thread et multi-thread)
+  depth.py                conversion disparité -> profondeur
+  manual_calibration.py   outil interactif de calibrage manuel (optionnel)
+data/                     paire d'images stéréo d'entrée
+results/                  exemples de résultats (figés, pour ce README)
+outputs/                  sorties régénérées à chaque exécution (non versionné)
 ```
