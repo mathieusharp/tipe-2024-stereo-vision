@@ -1,6 +1,6 @@
-# TIPE (2022) — Reconstruction de profondeur par stereo vision
+# TIPE (2024) — Reconstruction de profondeur par stereo vision
 
-> Dépôt d'archive : code d'un TIPE de classe préparatoire (2022), publié tel quel à titre de
+> Dépôt d'archive : code d'un TIPE de classe préparatoire (2024), publié tel quel à titre de
 > référence. Non maintenu activement.
 
 Problématique du TIPE : *comment mettre en place un système d'arbitrage vidéo, en s'inspirant de
